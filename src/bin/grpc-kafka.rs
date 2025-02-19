@@ -7,7 +7,7 @@ use {
     std::{net::SocketAddr, sync::Arc, time::Duration},
     tokio::task::JoinSet,
     tonic::transport::ClientTlsConfig,
-    tracing::{debug, trace, warn},
+    tracing::{debug, trace, warn, info, error},
     yellowstone_grpc_client::GeyserGrpcClient,
     yellowstone_grpc_kafka::{
         config::{load as config_load, GrpcRequestToProto},
@@ -26,7 +26,10 @@ use {
         prost::Message as _,
     },
 };
-
+use solana_sdk::pubkey::Pubkey;
+use rand::random;
+use solana_client::rpc_client::RpcClient;
+use std::time::{SystemTime, UNIX_EPOCH};
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about = "Yellowstone gRPC Kafka Tool")]
 struct Args {
@@ -55,6 +58,10 @@ enum ArgsAction {
 }
 
 impl ArgsAction {
+    fn serialize_log_error<E: std::fmt::Debug>(err: E) -> String {
+        format!("{:?}", err)
+    }
+
     async fn run(self, config: Config, kafka_config: ClientConfig) -> anyhow::Result<()> {
         let shutdown = create_shutdown()?;
         match self {
@@ -238,6 +245,7 @@ impl ArgsAction {
         let mut geyser = client.subscribe_once(config.request.to_proto()).await?;
 
         // Receive-send loop
+        let connection = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
         let mut send_tasks = JoinSet::new();
         loop {
             let message = tokio::select! {
@@ -282,6 +290,17 @@ impl ArgsAction {
                         UpdateOneof::BlockMeta(msg) => msg.slot,
                         UpdateOneof::Entry(msg) => msg.slot,
                     };
+                    let owner = match message {
+                        UpdateOneof::Account(msg) => msg.account.as_ref().map_or(Vec::new(), |info| info.owner.clone()),
+                        UpdateOneof::Slot(_) => Vec::new(),
+                        UpdateOneof::Transaction(_) => Vec::new(),
+                        UpdateOneof::TransactionStatus(_) => Vec::new(),
+                        UpdateOneof::Block(_) => Vec::new(),
+                        UpdateOneof::Ping(_) => Vec::new(),
+                        UpdateOneof::Pong(_) => Vec::new(),
+                        UpdateOneof::BlockMeta(_) => Vec::new(),
+                        UpdateOneof::Entry(_) => Vec::new(),
+                    };
                     let hash = Sha256::digest(&payload);
                     let key = format!("{slot}_{}", const_hex::encode(hash));
                     let prom_kind = GprcMessageKind::from(message);
@@ -292,12 +311,55 @@ impl ArgsAction {
 
                     match kafka.send_result(record) {
                         Ok(future) => {
+                            let connection_ref = Arc::clone(&connection);
                             let _ = send_tasks.spawn(async move {
                                 let result = future.await;
                                 debug!("kafka send message with key: {key}, result: {result:?}");
 
                                 let _ = result?.map_err(|(error, _message)| error)?;
                                 metrics::sent_inc(prom_kind);
+
+                                 // let's get start to begin log
+                                 if random::<f64>() < 0.01 {
+                                    match connection_ref.get_block_time(slot) {
+                                        Ok(block_time) => {
+                                            let current_time = SystemTime::now()
+                                                .duration_since(UNIX_EPOCH)
+                                                .expect("Time went backwards")
+                                                .as_millis() as u64;
+                            
+                                            let latency = current_time - block_time as u64 * 1000;
+                                            if owner.len() == 32 {
+                                                match Pubkey::try_from(owner.as_slice()) {
+                                                    Ok(pubkey) => {
+                                                        info!(
+                                                            "accountUpdate e2e latency: {} ms, owner: {}",
+                                                            latency, pubkey
+                                                        );
+                                                    },
+                                                    Err(_) => {
+                                                        info!(
+                                                            "accountUpdate e2e latency(owner i error): {} ms",
+                                                            latency
+                                                        );
+                                                    }
+                                                };
+                                            } else {
+                                                info!(
+                                                    "accountUpdate e2e latency: {} ms",
+                                                    latency
+                                                );
+                                            }
+                                        }
+                                        Err(err) => {
+                                            error!(
+                                                "Error getting block time: {}",
+                                                Self::serialize_log_error(&err)
+                                            );
+                                        }
+                                    }
+                                }
+
                                 Ok::<(), anyhow::Error>(())
                             });
                             if send_tasks.len() >= config.kafka_queue_size {
