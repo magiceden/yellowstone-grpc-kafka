@@ -245,7 +245,8 @@ impl ArgsAction {
         let mut geyser = client.subscribe_once(config.request.to_proto()).await?;
 
         // Receive-send loop
-        let connection = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
+        //todo hardcode
+        let connection = Arc::new(RpcClient::new("https://young-twilight-sun.solana-mainnet.quiknode.pro/1a84a0b63b2865dbdecc5cc27916b8298e8c4083/".to_string()));
         let mut send_tasks = JoinSet::new();
         loop {
             let message = tokio::select! {
