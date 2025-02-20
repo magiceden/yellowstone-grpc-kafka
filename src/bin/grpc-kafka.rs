@@ -229,10 +229,10 @@ impl ArgsAction {
         }
 
         // Connect to kafka
-        let (kafka, kafka_error_rx) = metrics::StatsContext::create_future_producer(&kafka_config)
+        /*let (kafka, kafka_error_rx) = metrics::StatsContext::create_future_producer(&kafka_config)
             .context("failed to create kafka producer")?;
         let mut kafka_error = false;
-        tokio::pin!(kafka_error_rx);
+        tokio::pin!(kafka_error_rx);*/
 
         // Create gRPC client & subscribe
         let mut client = GeyserGrpcClient::build_from_shared(config.endpoint)?
@@ -251,11 +251,11 @@ impl ArgsAction {
         loop {
             let message = tokio::select! {
                 _ = &mut shutdown => break,
-                _ = &mut kafka_error_rx => {
+                /*_ = &mut kafka_error_rx => {
                     kafka_error = true;
                     break;
                 }
-                /*maybe_result = send_tasks.join_next() => match maybe_result {
+                maybe_result = send_tasks.join_next() => match maybe_result {
                     Some(result) => {
                         result??;
                         continue;
@@ -304,7 +304,7 @@ impl ArgsAction {
                     };
                     let hash = Sha256::digest(&payload);
                     let key = format!("{slot}_{}", const_hex::encode(hash));
-                    let prom_kind = GprcMessageKind::from(message);
+                    // let prom_kind = GprcMessageKind::from(message);
 
                     if owner.len() == 32 {
                         match Pubkey::try_from(owner.as_slice()) {
