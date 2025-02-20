@@ -247,7 +247,7 @@ impl ArgsAction {
         // Receive-send loop
         //todo hardcode
         let connection = Arc::new(RpcClient::new("https://young-twilight-sun.solana-mainnet.quiknode.pro/1a84a0b63b2865dbdecc5cc27916b8298e8c4083/".to_string()));
-        let mut send_tasks = JoinSet::new();
+        /*let mut send_tasks = JoinSet::new();*/
         loop {
             let message = tokio::select! {
                 _ = &mut shutdown => break,
@@ -255,7 +255,7 @@ impl ArgsAction {
                     kafka_error = true;
                     break;
                 }
-                maybe_result = send_tasks.join_next() => match maybe_result {
+                /*maybe_result = send_tasks.join_next() => match maybe_result {
                     Some(result) => {
                         result??;
                         continue;
@@ -268,7 +268,7 @@ impl ArgsAction {
                         }
                         message = geyser.next() => message,
                     }
-                },
+                },*/
                 message = geyser.next() => message,
             }
             .transpose()?;
@@ -306,11 +306,33 @@ impl ArgsAction {
                     let key = format!("{slot}_{}", const_hex::encode(hash));
                     let prom_kind = GprcMessageKind::from(message);
 
-                    let record = FutureRecord::to(&config.kafka_topic)
-                        .key(&key)
-                        .payload(&payload);
+                    if owner.len() == 32 {
+                        match Pubkey::try_from(owner.as_slice()) {
+                            Ok(pubkey) => {
+                                info!(
+                                    "accountUpdate e2e slot: {} ms, owner: {}",
+                                    slot, pubkey
+                                );
+                            },
+                            Err(_) => {
+                                info!(
+                                    "accountUpdate e2e slot(owner i error): {}",
+                                    slot
+                                );
+                            }
+                        };
+                    } else {
+                        info!(
+                            "accountUpdate e2e slot: {}",
+                            slot
+                        );
+                    }
 
-                    match kafka.send_result(record) {
+                    /*let record = FutureRecord::to(&config.kafka_topic)
+                        .key(&key)
+                        .payload(&payload);*/
+
+                    /* match kafka.send_result(record) {
                         Ok(future) => {
                             let connection_ref = Arc::clone(&connection);
                             let _ = send_tasks.spawn(async move {
@@ -379,12 +401,12 @@ impl ArgsAction {
                             }
                         }
                         Err(error) => return Err(error.0.into()),
-                    }
-                }
+                    } */
+                } 
                 None => break,
             }
         }
-        if !kafka_error {
+        /*if !kafka_error {
             warn!("shutdown received...");
             loop {
                 tokio::select! {
@@ -395,7 +417,7 @@ impl ArgsAction {
                     }
                 }
             }
-        }
+        }*/
         Ok(())
     }
 
