@@ -20,17 +20,9 @@
         "endpoint": "http://yellowstone-mainnet.magiceden.dev:8080",
         "x_token": "eefeb099-35fe-450d-ba6b-4a24dbc4a20b",
         "request": {
-            "slots": {
-                "client": {
-                    "filter_by_commitment": null
-                }
-            },
-            "blocks": {
-                "client": {
-                    "account_include": [],
-                    "include_transactions": false,
-                    "include_accounts": false,
-                    "include_entries": false
+            "accounts": {
+                "solend": {
+                "owner": ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"]
                 }
             }
         },

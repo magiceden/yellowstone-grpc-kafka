@@ -30,6 +30,10 @@ use solana_sdk::pubkey::Pubkey;
 use rand::random;
 use solana_client::rpc_client::RpcClient;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::time::interval;
+use std::collections::VecDeque;
+use std::sync::Mutex;
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about = "Yellowstone gRPC Kafka Tool")]
 struct Args {
@@ -229,10 +233,10 @@ impl ArgsAction {
         }
 
         // Connect to kafka
-        /*let (kafka, kafka_error_rx) = metrics::StatsContext::create_future_producer(&kafka_config)
+        let (kafka, kafka_error_rx) = metrics::StatsContext::create_future_producer(&kafka_config)
             .context("failed to create kafka producer")?;
         let mut kafka_error = false;
-        tokio::pin!(kafka_error_rx);*/
+        tokio::pin!(kafka_error_rx);
 
         // Create gRPC client & subscribe
         let mut client = GeyserGrpcClient::build_from_shared(config.endpoint)?
@@ -245,13 +249,42 @@ impl ArgsAction {
         let mut geyser = client.subscribe_once(config.request.to_proto()).await?;
 
         // Receive-send loop
-        //todo hardcode
+        // todo hardcode
         let connection = Arc::new(RpcClient::new("https://young-twilight-sun.solana-mainnet.quiknode.pro/1a84a0b63b2865dbdecc5cc27916b8298e8c4083/".to_string()));
-        /*let mut send_tasks = JoinSet::new();*/
+        let mut send_tasks = JoinSet::new();
+        //xiaodong qps compute part
+        let message_timestamps = Arc::new(Mutex::new(VecDeque::new()));
+        let message_timestamps_ref = Arc::clone(&message_timestamps);
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(1));
+            loop {
+                ticker.tick().await;
+        
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_millis() as u64;
+        
+                let mut timestamps = message_timestamps_ref.lock().unwrap();
+                while let Some(&oldest) = timestamps.front() {
+                    if now - oldest > 1000 {
+                        timestamps.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+        
+                let qps = timestamps.len();
+                if qps > 2000 {
+                    info!("Processed {} messages in the last second", qps);
+                }
+            }
+        });
+
         loop {
             let message = tokio::select! {
                 _ = &mut shutdown => break,
-                /*_ = &mut kafka_error_rx => {
+                _ = &mut kafka_error_rx => {
                     kafka_error = true;
                     break;
                 }
@@ -268,7 +301,7 @@ impl ArgsAction {
                         }
                         message = geyser.next() => message,
                     }
-                },*/
+                },
                 message = geyser.next() => message,
             }
             .transpose()?;
@@ -304,9 +337,9 @@ impl ArgsAction {
                     };
                     let hash = Sha256::digest(&payload);
                     let key = format!("{slot}_{}", const_hex::encode(hash));
-                    // let prom_kind = GprcMessageKind::from(message);
+                    let prom_kind = GprcMessageKind::from(message);
 
-                    if owner.len() == 32 {
+                    /*if owner.len() == 32 {
                         match Pubkey::try_from(owner.as_slice()) {
                             Ok(pubkey) => {
                                 info!(
@@ -326,15 +359,17 @@ impl ArgsAction {
                             "accountUpdate e2e slot: {}",
                             slot
                         );
-                    }
+                    }*/
 
-                    /*let record = FutureRecord::to(&config.kafka_topic)
+                    let record = FutureRecord::to(&config.kafka_topic)
                         .key(&key)
-                        .payload(&payload);*/
+                        .payload(&payload);
 
-                    /* match kafka.send_result(record) {
+                    match kafka.send_result(record) {
                         Ok(future) => {
                             let connection_ref = Arc::clone(&connection);
+                            let message_timestamps_ref = Arc::clone(&message_timestamps);
+
                             let _ = send_tasks.spawn(async move {
                                 let result = future.await;
                                 debug!("kafka send message with key: {key}, result: {result:?}");
@@ -342,8 +377,13 @@ impl ArgsAction {
                                 let _ = result?.map_err(|(error, _message)| error)?;
                                 metrics::sent_inc(prom_kind);
 
+                                let now = SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .expect("Time went backwards")
+                                    .as_millis() as u64;
+                                message_timestamps_ref.lock().unwrap().push_back(now);                         
                                  // let's get start to begin log
-                                 if random::<f64>() < 0.01 {
+                                 if random::<f64>() < 0.00005 {
                                     match connection_ref.get_block_time(slot) {
                                         Ok(block_time) => {
                                             let current_time = SystemTime::now()
@@ -401,12 +441,12 @@ impl ArgsAction {
                             }
                         }
                         Err(error) => return Err(error.0.into()),
-                    } */
+                    }
                 } 
                 None => break,
             }
         }
-        /*if !kafka_error {
+        if !kafka_error {
             warn!("shutdown received...");
             loop {
                 tokio::select! {
@@ -417,7 +457,7 @@ impl ArgsAction {
                     }
                 }
             }
-        }*/
+        }
         Ok(())
     }
 
