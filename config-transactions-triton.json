@@ -1,0 +1,21 @@
+{
+  "kafka": {
+    "bootstrap.servers": "localhost:9092",
+    "statistics.interval.ms": "1000"
+  },
+  "grpc2kafka": {
+    "endpoint": "https://magicede-magicede-c0f1.mainnet.rpcpool.com:443",
+    "x_token": "0fff97350c7f710967265129471b",
+    "request": {
+      "transactions": {
+        "triton": {
+          "vote": false,
+          "failed": false
+        }
+      }
+    },
+    "kafka": {},
+    "kafka_topic": "core-indexing-sol-yellowstone-transaction-updates",
+    "kafka_queue_size": "10_000"
+  }
+}
