@@ -1,5 +1,4 @@
 {
-    "prometheus": "127.0.0.1:8873",
     "kafka": {
         "bootstrap.servers": "localhost:9092",
         "statistics.interval.ms": "1000"

@@ -275,13 +275,12 @@ impl ArgsAction {
                 }
         
                 let qps = timestamps.len();
-                if qps > 2000 {
-                    info!("Processed {} messages in the last second", qps);
-                }
+                info!("Processed {} messages in the last second", qps);
             }
         });
 
         loop {
+            let start_time = SystemTime::now();
             let message = tokio::select! {
                 _ = &mut shutdown => break,
                 _ = &mut kafka_error_rx => {
@@ -306,8 +305,11 @@ impl ArgsAction {
             }
             .transpose()?;
 
+            let geyser_duration = start_time.elapsed().expect("Time went backwards").as_millis();
             match message {
                 Some(message) => {
+                    let message_start_time = SystemTime::now();
+
                     let payload = message.encode_to_vec();
                     let message = match &message.update_oneof {
                         Some(value) => value,
@@ -360,6 +362,10 @@ impl ArgsAction {
                             slot
                         );
                     }*/
+                    let message_processing_duration = message_start_time
+                    .elapsed()
+                    .expect("Time went backwards")
+                    .as_millis();
 
                     let record = FutureRecord::to(&config.kafka_topic)
                         .key(&key)
@@ -367,11 +373,16 @@ impl ArgsAction {
 
                     match kafka.send_result(record) {
                         Ok(future) => {
+                            let kafka_start_time = SystemTime::now();
                             let connection_ref = Arc::clone(&connection);
                             let message_timestamps_ref = Arc::clone(&message_timestamps);
 
                             let _ = send_tasks.spawn(async move {
                                 let result = future.await;
+                                let kafka_duration = kafka_start_time
+                                .elapsed()
+                                .expect("Time went backwards")
+                                .as_millis();
                                 debug!("kafka send message with key: {key}, result: {result:?}");
 
                                 let _ = result?.map_err(|(error, _message)| error)?;
@@ -383,34 +394,43 @@ impl ArgsAction {
                                     .as_millis() as u64;
                                 message_timestamps_ref.lock().unwrap().push_back(now);                         
                                  // let's get start to begin log
-                                 if random::<f64>() < 0.00005 {
+                                 if random::<f64>() < 0.01 {
+                                    let before_block_time_call = SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .expect("Time went backwards")
+                                    .as_millis() as u64;
                                     match connection_ref.get_block_time(slot) {
                                         Ok(block_time) => {
+                                            let after_block_time_call = SystemTime::now()
+                                            .duration_since(UNIX_EPOCH)
+                                            .expect("Time went backwards")
+                                            .as_millis() as u64;
+                                            let block_time_duration = after_block_time_call - before_block_time_call;
                                             let current_time = SystemTime::now()
                                                 .duration_since(UNIX_EPOCH)
                                                 .expect("Time went backwards")
                                                 .as_millis() as u64;
-                            
-                                            let latency = current_time - block_time as u64 * 1000;
+                                            
+                                            let latency = current_time - block_time as u64 * 1000 - block_time_duration;;
                                             if owner.len() == 32 {
                                                 match Pubkey::try_from(owner.as_slice()) {
                                                     Ok(pubkey) => {
                                                         info!(
-                                                            "accountUpdate e2e latency: {} ms, owner: {}",
-                                                            latency, pubkey
+                                                            "accountUpdate e2e latency: {} ms, owner: {}, geyser_duration: {}ms, message_processing: {}ms, kafka_duration: {}ms, block_time_duration: {}ms",
+                                                            latency, pubkey, geyser_duration, message_processing_duration, kafka_duration, block_time_duration
                                                         );
                                                     },
                                                     Err(_) => {
                                                         info!(
-                                                            "accountUpdate e2e latency(owner i error): {} ms",
-                                                            latency
+                                                            "accountUpdate e2e latency(owner i error): {} ms, geyser_duration: {}ms, message_processing: {}ms, kafka_duration: {}ms, block_time_duration: {}ms",
+                                                            latency, geyser_duration, message_processing_duration, kafka_duration, block_time_duration
                                                         );
                                                     }
                                                 };
                                             } else {
                                                 info!(
-                                                    "accountUpdate e2e latency: {} ms",
-                                                    latency
+                                                    "accountUpdate e2e latency: {} ms, geyser_duration: {}ms, message_processing: {}ms, kafka_duration: {}ms, block_time_duration: {}ms",
+                                                    latency, geyser_duration, message_processing_duration, kafka_duration, block_time_duration
                                                 );
                                             }
                                         }
