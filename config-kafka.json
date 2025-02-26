@@ -1,7 +1,6 @@
 {
-    "prometheus": "127.0.0.1:8873",
     "kafka": {
-        "bootstrap.servers": "localhost:29092",
+        "bootstrap.servers": "localhost:9092",
         "statistics.interval.ms": "1000"
     },
     "dedup": {
@@ -17,20 +16,12 @@
         }
     },
     "grpc2kafka": {
-        "endpoint": "http://127.0.0.1:10000",
-        "x_token": null,
+        "endpoint": "http://yellowstone-mainnet.magiceden.dev:8080",
+        "x_token": "eefeb099-35fe-450d-ba6b-4a24dbc4a20b",
         "request": {
-            "slots": {
-                "client": {
-                    "filter_by_commitment": null
-                }
-            },
-            "blocks": {
-                "client": {
-                    "account_include": [],
-                    "include_transactions": false,
-                    "include_accounts": false,
-                    "include_entries": false
+            "accounts": {
+                "solend": {
+                "owner": ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"]
                 }
             }
         },

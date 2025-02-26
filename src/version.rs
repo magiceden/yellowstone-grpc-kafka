@@ -16,7 +16,7 @@ pub const VERSION: Version = Version {
     version: env!("CARGO_PKG_VERSION"),
     proto: env!("YELLOWSTONE_GRPC_PROTO_VERSION"),
     solana: env!("SOLANA_SDK_VERSION"),
-    git: env!("GIT_VERSION"),
+    git: "2.1.0",
     rustc: env!("VERGEN_RUSTC_SEMVER"),
     buildts: env!("VERGEN_BUILD_TIMESTAMP"),
 };

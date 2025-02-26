@@ -1,0 +1,6 @@
+"hostRequirements": {
+   "cpus": 32,
+   "memory": "32gb",
+   "storage": "64gb"
+},
+"image": "ubuntu:22.04"

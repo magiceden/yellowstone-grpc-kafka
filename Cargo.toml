@@ -38,6 +38,13 @@ tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 yellowstone-grpc-client = { version = "4.0.0", optional = true }
 yellowstone-grpc-proto = "4.0.0"
+solana-account-decoder = "~2.1.1"
+solana-logger = "~2.1.1"
+solana-sdk = "~2.1.1"
+solana-storage-proto = "~2.1.1"
+solana-transaction-status = "~2.1.1"
+solana-client = "~2.1.1" 
+rand = "0.8"
 
 [target.'cfg(not(all(target_os = "macos", target_arch = "aarch64")))'.dependencies]
 rdkafka = { version = "0.36.2", features = ["sasl", "ssl"], optional = true }
