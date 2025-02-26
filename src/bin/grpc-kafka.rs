@@ -30,10 +30,99 @@ use solana_sdk::pubkey::Pubkey;
 use rand::random;
 use solana_client::rpc_client::RpcClient;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::time::interval;
 use std::collections::VecDeque;
 use std::sync::Mutex;
+use std::env;
+use dogstatsd::{Client, Options};
+use once_cell::sync::Lazy;
+
+#[derive(Debug)]
+pub struct DogStatsd {
+    pub client: Option<Client>,
+}
+
+impl DogStatsd {
+    pub fn new() -> Self {
+        let dd_agent_host = env::var("DD_AGENT_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let dd_agent_port = env::var("DD_DOGSTATSD_PORT").unwrap_or_else(|_| "8125".to_string());
+
+        let options = Options::new(
+            &dd_agent_host,
+            &dd_agent_port,
+            "my-app",
+            vec![], 
+            None,
+            None,
+        );
+
+        match Client::new(options) {
+            Ok(client) => Self { client: Some(client) },
+            Err(e) => {
+                eprintln!("Failed to create DogStatsD client: {:?}", e);
+                Self { client: None }
+            }
+        }
+    }
+}
+
+static DOGSTATSD: Lazy<Mutex<DogStatsd>> = Lazy::new(|| Mutex::new(DogStatsd::new()));
+
+#[derive(Debug)]
+pub enum StatsdMetricsType {
+    Gauge,
+    Count,
+    Histogram,
+    Timing,
+    Distribution,
+}
+
+pub fn submit_statsd_metrics(
+    metric: &str,
+    data: f64,
+    metric_type: StatsdMetricsType,
+    tags: Option<Vec<String>>,
+) {
+    let tags = tags.unwrap_or_default();
+    let tag_refs: Vec<&str> = tags.iter().map(|s| s.as_str()).collect();
+
+    let dogstatsd = DOGSTATSD.lock().unwrap();
+
+    if let Some(client) = &dogstatsd.client {
+        let data_str = data.to_string(); // `f64 -> String`
+
+        match metric_type {
+            StatsdMetricsType::Gauge => {
+                if let Err(e) = client.gauge(metric, &data_str, &tag_refs) {
+                    eprintln!("Failed to send gauge metric: {:?}", e);
+                }
+            }
+            StatsdMetricsType::Count => {
+                let count_value = data as i64; // `f64 -> i64`
+                if let Err(e) = client.count(metric, count_value, &tag_refs) {
+                    eprintln!("Failed to send count metric: {:?}", e);
+                }
+            }
+            StatsdMetricsType::Histogram => {
+                if let Err(e) = client.histogram(metric, &data_str, &tag_refs) {
+                    eprintln!("Failed to send histogram metric: {:?}", e);
+                }
+            }
+            StatsdMetricsType::Timing => {
+                let timing_value = data as i64; // `f64 -> i64`
+                if let Err(e) = client.timing(metric, timing_value, &tag_refs) {
+                    eprintln!("Failed to send timing metric: {:?}", e);
+                }
+            }
+            StatsdMetricsType::Distribution => {
+                if let Err(e) = client.distribution(metric, &data_str, &tag_refs) {
+                    eprintln!("Failed to send distribution metric: {:?}", e);
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about = "Yellowstone gRPC Kafka Tool")]
 struct Args {
@@ -411,7 +500,7 @@ impl ArgsAction {
                                                 .expect("Time went backwards")
                                                 .as_millis() as u64;
                                             
-                                            let latency = current_time - block_time as u64 * 1000 - block_time_duration;;
+                                            let latency = current_time - block_time as u64 * 1000 - block_time_duration;
                                             if owner.len() == 32 {
                                                 match Pubkey::try_from(owner.as_slice()) {
                                                     Ok(pubkey) => {

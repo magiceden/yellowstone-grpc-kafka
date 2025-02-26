@@ -1,7 +1,8 @@
 {
     "kafka": {
         "bootstrap.servers": "localhost:9092",
-        "statistics.interval.ms": "1000"
+        "statistics.interval.ms": "1000",
+        "message.max.bytes": "15728640"
     },
     "dedup": {
         "kafka": {
@@ -16,15 +17,9 @@
         }
     },
     "grpc2kafka": {
-        "endpoint": "http://yellowstone-mainnet.magiceden.dev:8080",
-        "x_token": "eefeb099-35fe-450d-ba6b-4a24dbc4a20b",
-        "request": {
-            "accounts": {
-                "solend": {
-                "owner": ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"]
-                }
-            }
-        },
+        "endpoint": "https://magicede-magicede-c0f1.mainnet.rpcpool.com:443",
+        "x_token": "0fff97350c7f710967265129471b",
+        "request":{"accounts":{"triton":{"vote":false,"failed":false}}},
         "kafka": {},
         "kafka_topic": "grpc1",
         "kafka_queue_size": "10_000"

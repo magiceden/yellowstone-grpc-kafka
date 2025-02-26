@@ -1283,6 +1283,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstatsd"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "faeb22dbbf6aef8e687ad83f9cd9fd893ac5c0f36d2e46fb0cbcf7ae19640ec0"
+dependencies = [
+ "chrono",
+ "retry",
+]
+
+[[package]]
 name = "duct"
 version = "0.13.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3504,6 +3514,15 @@ dependencies = [
  "serde",
  "task-local-extensions",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "retry"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9166d72162de3575f950507683fac47e30f6f2c3836b71b7fbc61aa517c9c5f4"
+dependencies = [
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -6699,6 +6718,7 @@ dependencies = [
  "cargo-lock",
  "clap",
  "const-hex",
+ "dogstatsd",
  "futures",
  "git-version",
  "http 1.1.0",
@@ -6707,6 +6727,7 @@ dependencies = [
  "hyper-util",
  "json5",
  "lazy_static",
+ "once_cell",
  "prometheus",
  "rand 0.8.5",
  "rdkafka",

@@ -45,6 +45,8 @@ solana-storage-proto = "~2.1.1"
 solana-transaction-status = "~2.1.1"
 solana-client = "~2.1.1" 
 rand = "0.8"
+dogstatsd = "0.12.1"
+once_cell = "1.19"
 
 [target.'cfg(not(all(target_os = "macos", target_arch = "aarch64")))'.dependencies]
 rdkafka = { version = "0.36.2", features = ["sasl", "ssl"], optional = true }
