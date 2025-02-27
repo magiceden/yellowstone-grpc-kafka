@@ -39,3 +39,20 @@ cargo run --bin grpc-kafka -- --config config-kafka.json grpc2kafka
 # read messages from Kafka
 kafka_2.13-3.5.0/bin/kafka-console-consumer.sh --bootstrap-server localhost:29092 --topic grpc1
 ```
+
+##### Docker
+
+Copy configs from
+[1password](https://magiceden.1password.com/app#/enwqmcpqdnrfqgtgdybhk4a5ae/AllItems/enwqmcpqdnrfqgtgdybhk4a5aef4usldlzfiviqfgtb2aswi7yly)
+to the root directory. Then build and run.
+
+Start Kafka from the [monorepo](https://github.com/magiceden/magiceden?tab=readme-ov-file#kafka-debugging).
+That way you can view deserialized messages in Redpanda.
+
+```
+docker build -t grpc-kafka-image .
+docker run -it --rm --network host --name grpc-kafka-slots grpc-kafka-image grpc-kafka --config config-local-slots-triton.json grpc2kafka
+docker run -it --rm --network host --name grpc-kafka-txs grpc-kafka-image grpc-kafka --config config-local-transactions-triton.json grpc2kafka
+```
+
+Visit http://localhost:8081/topics?q=core-indexing-sol-yellowstone to view topics and messages.
