@@ -9,7 +9,8 @@
     "request": {
       "slots": {
         "triton": {}
-      }
+      },
+      "ping": 1
     },
     "kafka": {},
     "kafka_topic": "core-indexing-sol-yellowstone-slot-updates",

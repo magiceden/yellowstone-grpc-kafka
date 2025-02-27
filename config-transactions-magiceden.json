@@ -12,7 +12,8 @@
           "vote": false,
           "failed": false
         }
-      }
+      },
+      "ping": 1
     },
     "kafka": {},
     "kafka_topic": "core-indexing-sol-yellowstone-transaction-updates",
