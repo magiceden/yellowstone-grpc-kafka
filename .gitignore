@@ -10,3 +10,4 @@ dump.rdb
 *.sw?
 
 config-local-*
+ping.txt
