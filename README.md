@@ -39,3 +39,12 @@ cargo run --bin grpc-kafka -- --config config-kafka.json grpc2kafka
 # read messages from Kafka
 kafka_2.13-3.5.0/bin/kafka-console-consumer.sh --bootstrap-server localhost:29092 --topic grpc1
 ```
+
+##### Docker
+
+Copy configs from [1password](https://magiceden.1password.com/app#/enwqmcpqdnrfqgtgdybhk4a5ae/AllItems/enwqmcpqdnrfqgtgdybhk4a5aef4usldlzfiviqfgtb2aswi7yly/edit) to your root directory. Then build and run.
+
+```
+docker build -t grpc-kafka .
+docker run -it --rm --network host --name grpc-kafka-runner grpc-kafka grpc-kafka --config config-local-slots-triton.json grpc2kafka
+```
