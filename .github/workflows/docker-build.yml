@@ -1,0 +1,37 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches:
+      - release
+      - feat/add-docker-build-workflow
+
+jobs:
+  build-and-push:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get short SHA
+        id: sha
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: magiceden/gha-workflows/.github/actions/build-docker@main
+        with:
+          dockerfile: Dockerfile
+          registry: yellowstone-grpc-kafka
+          platforms: linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tag: ${{ steps.sha.outputs.SHORT_SHA }}
+          iam-role-arn: arn:aws:iam::592387314779:role/gh-actions
+          aws-region: us-east-2
