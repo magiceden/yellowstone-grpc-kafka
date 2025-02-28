@@ -16,7 +16,6 @@ COPY --from=builder /usr/src/yellowstone-grpc-kafka/target/release/grpc-kafka /u
 COPY config-* .
 COPY healthcheck.sh .
 
-# Create user with same ID as in Kubernetes config
 RUN groupadd -g 1001 appuser && \
     useradd -u 1001 -g 1001 -s /bin/bash -m appuser && \
     chown -R appuser:appuser /usr/src/yellowstone-grpc-kafka && \
@@ -24,5 +23,4 @@ RUN groupadd -g 1001 appuser && \
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s CMD ./healthcheck.sh
 
-# Switch to non-root user
 USER appuser
