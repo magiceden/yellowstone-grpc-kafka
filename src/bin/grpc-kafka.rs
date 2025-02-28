@@ -7,7 +7,7 @@ use {
     std::{net::SocketAddr, sync::Arc, time::Duration},
     tokio::task::JoinSet,
     tonic::transport::ClientTlsConfig,
-    tracing::{debug, trace, warn},
+    tracing::{debug, trace, warn, info, error},
     yellowstone_grpc_client::GeyserGrpcClient,
     yellowstone_grpc_kafka::{
         config::{load as config_load, GrpcRequestToProto},
@@ -27,6 +27,13 @@ use {
         prost::Message as _,
     },
 };
+use solana_sdk::pubkey::Pubkey;
+use rand::random;
+use solana_client::rpc_client::RpcClient;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::time::interval;
+use std::collections::VecDeque;
+use std::sync::Mutex;
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about = "Yellowstone gRPC Kafka Tool")]
@@ -56,6 +63,10 @@ enum ArgsAction {
 }
 
 impl ArgsAction {
+    fn serialize_log_error<E: std::fmt::Debug>(err: E) -> String {
+        format!("{:?}", err)
+    }
+
     async fn run(self, config: Config, kafka_config: ClientConfig) -> anyhow::Result<()> {
         let shutdown = create_shutdown()?;
         match self {
@@ -240,7 +251,36 @@ impl ArgsAction {
 
         // Receive-send loop
         let mut send_tasks = JoinSet::new();
+        // by thomas.xiaodong, this part is about to get a new thread to compute some qps stuff
+        let connection = Arc::new(RpcClient::new("https://young-twilight-sun.solana-mainnet.quiknode.pro/1a84a0b63b2865dbdecc5cc27916b8298e8c4083/".to_string()));
+        let message_timestamps = Arc::new(Mutex::new(VecDeque::new()));
+        let message_timestamps_ref = Arc::clone(&message_timestamps);
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(1));
+            loop {
+                ticker.tick().await;
+
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_millis() as u64;
+
+                let mut timestamps = message_timestamps_ref.lock().unwrap();
+                while let Some(&oldest) = timestamps.front() {
+                    if now - oldest > 1000 {
+                        timestamps.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+
+                let qps = timestamps.len();
+                info!("Processed {} messages in the last second", qps);
+            }
+        });
+
         loop {
+            let start_time = SystemTime::now();
             let message = tokio::select! {
                 _ = &mut shutdown => break,
                 _ = &mut kafka_error_rx => {
@@ -265,6 +305,7 @@ impl ArgsAction {
             }
             .transpose()?;
 
+            let geyser_duration = start_time.elapsed().expect("Time went backwards").as_millis();
             match message {
                 Some(message) => {
                     let payload = message.encode_to_vec();
@@ -286,6 +327,19 @@ impl ArgsAction {
                         UpdateOneof::BlockMeta(msg) => msg.slot,
                         UpdateOneof::Entry(msg) => msg.slot,
                     };
+                    // by thomas.xiaodong, this part is about to get us the owner of the account, so we can know which owner be a little alow
+                    let owner = match message {
+                        UpdateOneof::Account(msg) => msg.account.as_ref().map_or(Vec::new(), |info| info.owner.clone()),
+                        UpdateOneof::Slot(_) => Vec::new(),
+                        UpdateOneof::Transaction(_) => Vec::new(),
+                        UpdateOneof::TransactionStatus(_) => Vec::new(),
+                        UpdateOneof::Block(_) => Vec::new(),
+                        UpdateOneof::Ping(_) => Vec::new(),
+                        UpdateOneof::Pong(_) => Vec::new(),
+                        UpdateOneof::BlockMeta(_) => Vec::new(),
+                        UpdateOneof::Entry(_) => Vec::new(),
+                    };
+
                     let hash = Sha256::digest(&payload);
                     let key = format!("{slot}_{}", const_hex::encode(hash));
                     let prom_kind = GprcMessageKind::from(message);
@@ -296,12 +350,75 @@ impl ArgsAction {
 
                     match kafka.send_result(record) {
                         Ok(future) => {
+                            let kafka_start_time = SystemTime::now();
+                            let connection_ref = Arc::clone(&connection);
+                            let message_timestamps_ref = Arc::clone(&message_timestamps);
                             let _ = send_tasks.spawn(async move {
                                 let result = future.await;
+                                let kafka_duration = kafka_start_time
+                                .elapsed()
+                                .expect("Time went backwards")
+                                .as_millis();
                                 debug!("kafka send message with key: {key}, result: {result:?}");
 
                                 let _ = result?.map_err(|(error, _message)| error)?;
                                 metrics::sent_inc(prom_kind);
+
+                                // by thomas.xiaodong, this part is about to log the lag, log the latency
+                                let now = SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .expect("Time went backwards")
+                                    .as_millis() as u64;
+                                message_timestamps_ref.lock().unwrap().push_back(now);                         
+                                 // let's get start to begin log
+                                 if random::<f64>() < 0.01 {
+                                    let before_block_time_call = SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .expect("Time went backwards")
+                                    .as_millis() as u64;
+                                    match connection_ref.get_block_time(slot) {
+                                        Ok(block_time) => {
+                                            let after_block_time_call = SystemTime::now()
+                                            .duration_since(UNIX_EPOCH)
+                                            .expect("Time went backwards")
+                                            .as_millis() as u64;
+                                            let block_time_duration = after_block_time_call - before_block_time_call;
+                                            let current_time = SystemTime::now()
+                                                .duration_since(UNIX_EPOCH)
+                                                .expect("Time went backwards")
+                                                .as_millis() as u64;
+
+                                            let latency = current_time - block_time as u64 * 1000 - block_time_duration;
+                                            if owner.len() == 32 {
+                                                match Pubkey::try_from(owner.as_slice()) {
+                                                    Ok(pubkey) => {
+                                                        info!(
+                                                            "accountUpdate e2e latency: {} ms, owner: {}, geyser_duration: {}ms, kafka_duration: {}ms, block_time_duration: {}ms",
+                                                            latency, pubkey, geyser_duration, kafka_duration, block_time_duration
+                                                        );
+                                                    },
+                                                    Err(_) => {
+                                                        info!(
+                                                            "accountUpdate e2e latency(owner i error): {} ms, geyser_duration: {}ms, kafka_duration: {}ms, block_time_duration: {}ms",
+                                                            latency, geyser_duration, kafka_duration, block_time_duration
+                                                        );
+                                                    }
+                                                };
+                                            } else {
+                                                info!(
+                                                    "accountUpdate e2e latency: {} ms, geyser_duration: {}ms, kafka_duration: {}ms, block_time_duration: {}ms",
+                                                    latency, geyser_duration, kafka_duration, block_time_duration
+                                                );
+                                            }
+                                        }
+                                        Err(err) => {
+                                            error!(
+                                                "Error getting block time: {}",
+                                                Self::serialize_log_error(&err)
+                                            );
+                                        }
+                                    }
+                                }
                                 Ok::<(), anyhow::Error>(())
                             });
                             if send_tasks.len() >= config.kafka_queue_size {
