@@ -1,11 +1,9 @@
-# Use debian bullseye for ARM64 compatibility
 FROM --platform=$BUILDPLATFORM rust:1.85.0-bullseye AS builder
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
 WORKDIR /usr/src/yellowstone-grpc-kafka
 
-# Install dependencies with specific architecture handling
 RUN dpkg --add-architecture arm64 && \
     apt-get update && \
     apt-get install -y \
@@ -20,13 +18,12 @@ RUN dpkg --add-architecture arm64 && \
 COPY . .
 RUN cargo build --release --target aarch64-unknown-linux-gnu
 
-# Use non-slim image for runtime
-FROM --platform=$TARGETPLATFORM debian:bullseye
+FROM --platform=$TARGETPLATFORM debian:bullseye-slim
 
 WORKDIR /usr/src/yellowstone-grpc-kafka
 
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
     libsasl2-2 \
     libssl1.1 \
     ca-certificates \
