@@ -252,7 +252,7 @@ impl ArgsAction {
         // Receive-send loop
         let mut send_tasks = JoinSet::new();
         // by thomas.xiaodong, this part is about to get a new thread to compute some qps stuff
-        let connection = Arc::new(RpcClient::new("https://young-twilight-sun.solana-mainnet.quiknode.pro/1a84a0b63b2865dbdecc5cc27916b8298e8c4083/".to_string()));
+        let connection = Arc::new(RpcClient::new(config.rpc_client.to_string()));
         let message_timestamps = Arc::new(Mutex::new(VecDeque::new()));
         let message_timestamps_ref = Arc::clone(&message_timestamps);
         tokio::spawn(async move {
