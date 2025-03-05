@@ -46,6 +46,7 @@ impl ConfigDedupBackend {
 #[derive(Debug, Deserialize)]
 pub struct ConfigGrpc2Kafka {
     pub endpoint: String,
+    pub rpc_client: String,
     pub x_token: Option<String>,
     pub request: ConfigGrpcRequest,
     #[serde(default)]
