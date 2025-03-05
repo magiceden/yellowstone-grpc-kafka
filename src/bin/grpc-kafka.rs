@@ -12,6 +12,7 @@ use {
     yellowstone_grpc_kafka::{
         config::{load as config_load, GrpcRequestToProto},
         create_shutdown,
+        health::ack_ping,
         kafka::{
             config::{Config, ConfigDedup, ConfigGrpc2Kafka, ConfigKafka2Grpc},
             dedup::KafkaDedup,
@@ -277,7 +278,10 @@ impl ArgsAction {
                         UpdateOneof::Transaction(msg) => msg.slot,
                         UpdateOneof::TransactionStatus(msg) => msg.slot,
                         UpdateOneof::Block(msg) => msg.slot,
-                        UpdateOneof::Ping(_) => continue,
+                        UpdateOneof::Ping(_) => {
+                            ack_ping();
+                            continue;
+                        }
                         UpdateOneof::Pong(_) => continue,
                         UpdateOneof::BlockMeta(msg) => msg.slot,
                         UpdateOneof::Entry(msg) => msg.slot,
