@@ -1,6 +1,5 @@
 use {
-    crate::metrics::GprcMessageKind,
-    prometheus::{GaugeVec, IntCounter, IntCounterVec, Opts},
+    prometheus::{GaugeVec, IntCounter, Opts},
     rdkafka::{
         client::{ClientContext, DefaultClientContext},
         config::{ClientConfig, FromClientConfigAndContext, RDKafkaLogLevel},
@@ -27,9 +26,8 @@ lazy_static::lazy_static! {
         "kafka_recv_total", "Total number of received messages"
     ).unwrap();
 
-    pub(crate) static ref KAFKA_SENT_TOTAL: IntCounterVec = IntCounterVec::new(
-        Opts::new("kafka_sent_total", "Total number of uploaded messages by type"),
-        &["kind"]
+    pub(crate) static ref KAFKA_SENT_TOTAL: IntCounter = IntCounter::new(
+        "kafka_sent_total", "Total number of uploaded messages by type"
     ).unwrap();
 }
 
@@ -161,6 +159,6 @@ pub fn recv_inc() {
     KAFKA_RECV_TOTAL.inc();
 }
 
-pub fn sent_inc(kind: GprcMessageKind) {
-    KAFKA_SENT_TOTAL.with_label_values(&[kind.as_str()]).inc()
+pub fn sent_inc() {
+    KAFKA_SENT_TOTAL.inc()
 }
