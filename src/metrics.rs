@@ -16,7 +16,6 @@ use {
     std::{convert::Infallible, net::SocketAddr, sync::Once},
     tokio::net::TcpListener,
     tracing::{error, info},
-    yellowstone_grpc_proto::prelude::subscribe_update::UpdateOneof,
 };
 
 lazy_static::lazy_static! {
@@ -109,51 +108,4 @@ fn not_found_handler() -> http::Result<Response<BoxBody<Bytes, Infallible>>> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(BodyEmpty::new().boxed())
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum GprcMessageKind {
-    Account,
-    Slot,
-    Transaction,
-    TransactionStatus,
-    Block,
-    Ping,
-    Pong,
-    BlockMeta,
-    Entry,
-    Unknown,
-}
-
-impl From<&UpdateOneof> for GprcMessageKind {
-    fn from(msg: &UpdateOneof) -> Self {
-        match msg {
-            UpdateOneof::Account(_) => Self::Account,
-            UpdateOneof::Slot(_) => Self::Slot,
-            UpdateOneof::Transaction(_) => Self::Transaction,
-            UpdateOneof::TransactionStatus(_) => Self::TransactionStatus,
-            UpdateOneof::Block(_) => Self::Block,
-            UpdateOneof::Ping(_) => Self::Ping,
-            UpdateOneof::Pong(_) => Self::Pong,
-            UpdateOneof::BlockMeta(_) => Self::BlockMeta,
-            UpdateOneof::Entry(_) => Self::Entry,
-        }
-    }
-}
-
-impl GprcMessageKind {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            GprcMessageKind::Account => "account",
-            GprcMessageKind::Slot => "slot",
-            GprcMessageKind::Transaction => "transaction",
-            GprcMessageKind::TransactionStatus => "transactionstatus",
-            GprcMessageKind::Block => "block",
-            GprcMessageKind::Ping => "ping",
-            GprcMessageKind::Pong => "pong",
-            GprcMessageKind::BlockMeta => "blockmeta",
-            GprcMessageKind::Entry => "entry",
-            GprcMessageKind::Unknown => "unknown",
-        }
-    }
 }
