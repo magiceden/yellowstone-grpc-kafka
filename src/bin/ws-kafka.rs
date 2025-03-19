@@ -22,16 +22,14 @@ async fn ws2kafka(config: EnvConfig, mut shutdown: BoxFuture<'static, ()>) -> an
     tokio::pin!(kafka_error_rx);
 
     // Connect to websocket
-    let (ws_stream, _response) = connect_async(&config.websocket_request_url).await?;
+    let (ws_stream, _response) = connect_async(&config.request.url).await?;
     let (mut write_sink, mut read_stream) = ws_stream.split();
 
     // Create an interval to ping every 10 seconds
     let mut ping_interval = tokio::time::interval(Duration::from_millis(10000));
 
     // Subscribe to events
-    write_sink
-        .send(Message::text(config.websocket_request_body))
-        .await?;
+    write_sink.send(Message::text(config.request.body)).await?;
 
     // Receive-send loop
     let mut send_tasks = JoinSet::new();
@@ -84,7 +82,7 @@ async fn ws2kafka(config: EnvConfig, mut shutdown: BoxFuture<'static, ()>) -> an
                 let hash = Sha256::digest(&payload);
                 let key = const_hex::encode(hash);
 
-                let record = FutureRecord::to(&config.kafka_topic)
+                let record = FutureRecord::to(&config.kafka.topic)
                     .key(&key)
                     .payload(&payload);
 
@@ -98,7 +96,7 @@ async fn ws2kafka(config: EnvConfig, mut shutdown: BoxFuture<'static, ()>) -> an
                             metrics::sent_inc();
                             Ok::<(), anyhow::Error>(())
                         });
-                        if send_tasks.len() >= config.kafka_queue_size {
+                        if send_tasks.len() >= config.kafka.queue_size {
                             tokio::select! {
                                 _ = &mut shutdown => break,
                                 _ = &mut kafka_error_rx => {
