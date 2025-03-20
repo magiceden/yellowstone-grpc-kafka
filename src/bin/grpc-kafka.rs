@@ -10,8 +10,9 @@ use {
     tracing::{debug, trace, warn},
     yellowstone_grpc_client::GeyserGrpcClient,
     yellowstone_grpc_kafka::{
-        config::{load as config_load, GrpcRequestToProto},
+        config::GrpcRequestToProto,
         create_shutdown,
+        env::load_grpc2kafka_config,
         health::ack_ping,
         kafka::{
             config::{Config, ConfigDedup, ConfigGrpc2Kafka, ConfigKafka2Grpc},
@@ -56,6 +57,14 @@ enum ArgsAction {
 }
 
 impl ArgsAction {
+    fn load_config(&self) -> anyhow::Result<Config> {
+        match self {
+            ArgsAction::Dedup => Err(anyhow::anyhow!("`dedup` env is not supported")),
+            ArgsAction::Grpc2Kafka => load_grpc2kafka_config(),
+            ArgsAction::Kafka2Grpc => Err(anyhow::anyhow!("`kafka2grpc` env is not supported")),
+        }
+    }
+
     async fn run(self, config: Config, kafka_config: ClientConfig) -> anyhow::Result<()> {
         let shutdown = create_shutdown()?;
         match self {
@@ -400,7 +409,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Parse args
     let args = Args::parse();
-    let config = config_load::<Config>(&args.config).await?;
+    let config = args.action.load_config()?;
 
     // Run prometheus server
     if let Some(address) = args.prometheus.or(config.prometheus) {
