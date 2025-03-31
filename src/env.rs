@@ -92,6 +92,7 @@ fn build_wss2kafka() -> anyhow::Result<ConfigWss2Kafka> {
         kafka: HashMap::new(),
         kafka_topic: required_env_value("KAFKA_TOPIC")?,
         kafka_queue_size: required_env_value("KAFKA_QUEUE_SIZE")?.parse()?,
+        tags: json5::from_str(&required_env_value("EVENT_TAGS")?).expect("Invalid event tags"),
     })
 }
 
