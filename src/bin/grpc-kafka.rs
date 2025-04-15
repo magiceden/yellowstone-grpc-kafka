@@ -430,8 +430,9 @@ impl ArgsAction {
         let (ws_stream, _response) = connect_async(&config.endpoint).await?;
         let (mut write_sink, mut read_stream) = ws_stream.split();
 
-        // Create an interval to ping every 10 seconds
-        let mut ping_interval = tokio::time::interval(Duration::from_millis(10000));
+        // Create an interval to ping every n seconds
+        let mut ping_interval =
+            tokio::time::interval(Duration::from_millis(config.ping_interval_ms));
 
         // Subscribe to events
         write_sink.send(TokioMessage::text(config.request)).await?;
@@ -446,7 +447,7 @@ impl ArgsAction {
                     break;
                 }
                 _ = ping_interval.tick() => {
-                    tokio::spawn(ack_ping());
+                    write_sink.send(TokioMessage::Ping("magic".into())).await?;
                     continue;
                 }
                 maybe_result = send_tasks.join_next() => match maybe_result {
@@ -461,7 +462,7 @@ impl ArgsAction {
                             break;
                         }
                         _ = ping_interval.tick() => {
-                            tokio::spawn(ack_ping());
+                            write_sink.send(TokioMessage::Ping("magic".into())).await?;
                             continue;
                         }
                         message = read_stream.next() => message,
@@ -475,6 +476,14 @@ impl ArgsAction {
                 Some(message) => {
                     if message.is_close() {
                         break;
+                    }
+                    if message.is_ping() {
+                        tokio::spawn(ack_ping());
+                        continue;
+                    }
+                    if message.is_pong() {
+                        tokio::spawn(ack_pong());
+                        continue;
                     }
                     if !message.is_text() {
                         continue;
@@ -505,7 +514,7 @@ impl ArgsAction {
                                         break;
                                     }
                                     _ = ping_interval.tick() => {
-                                        tokio::spawn(ack_ping());
+                                        write_sink.send(TokioMessage::Ping("magic".into())).await?;
                                         continue;
                                     }
                                     result = send_tasks.join_next() => {

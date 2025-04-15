@@ -86,6 +86,7 @@ pub struct ConfigWss2Kafka {
     pub endpoint: String,
     pub x_token: Option<String>,
     pub request: String,
+    pub ping_interval_ms: u64,
     #[serde(default)]
     pub kafka: HashMap<String, String>,
     pub kafka_topic: String,

@@ -89,6 +89,7 @@ fn build_wss2kafka() -> anyhow::Result<ConfigWss2Kafka> {
         endpoint: required_secret("REQUEST_ENDPOINT")?,
         x_token: None,
         request: required_env_value("REQUEST_BODY")?,
+        ping_interval_ms: required_env_value("PING_INTERVAL_MS")?.parse()?,
         kafka: HashMap::new(),
         kafka_topic: required_env_value("KAFKA_TOPIC")?,
         kafka_queue_size: required_env_value("KAFKA_QUEUE_SIZE")?.parse()?,
