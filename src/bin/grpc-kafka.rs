@@ -8,7 +8,7 @@ use {
     tokio::task::JoinSet,
     tokio_tungstenite::{connect_async, tungstenite::protocol::Message as TokioMessage},
     tonic::transport::ClientTlsConfig,
-    tracing::{debug, trace, warn},
+    tracing::{debug, info, trace, warn},
     yellowstone_grpc_client::GeyserGrpcClient,
     yellowstone_grpc_kafka::{
         config::GrpcRequestToProto,
@@ -242,6 +242,7 @@ impl ArgsAction {
         for (key, value) in config.kafka.into_iter() {
             kafka_config.set(key, value);
         }
+        kafka_config.set("debug", "broker,topic,msg");
 
         // Connect to kafka
         let (kafka, kafka_error_rx) = metrics::StatsContext::create_future_producer(&kafka_config)
@@ -317,7 +318,7 @@ impl ArgsAction {
                     let record = FutureRecord::to(&config.kafka_topic)
                         .key(&key)
                         .payload(&payload);
-
+                    println!("Foobar message to kafka {}", payload.len());
                     match kafka.send_result(record) {
                         Ok(future) => {
                             let _ = send_tasks.spawn(async move {
